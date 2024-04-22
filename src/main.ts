@@ -3,7 +3,8 @@ import { promisify } from 'util'
 import type { CDPSession, Protocol } from 'puppeteer-core'
 // eslint-disable-next-line import/no-unresolved
 import { getUrlPatternRegExp } from './urlPattern.js'
-import { InterceptionMap } from './InterceptionMap'
+// eslint-disable-next-line import/no-unresolved
+import { InterceptionMap } from './InterceptionMap.js'
 
 export { getUrlPatternRegExp }
 
