@@ -2587,6 +2587,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@mryellowsock/puppeteer-intercept-and-modify-requests@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "@mryellowsock/puppeteer-intercept-and-modify-requests@workspace:."
+  dependencies:
+    "@niieani/scaffold": "npm:^1.7.11"
+    escape-string-regexp: "npm:^4.0.0"
+    get-port: "npm:^5.0.0"
+    puppeteer: "npm:^21.5.0"
+    puppeteer-core: "npm:^21.5.0"
+  languageName: unknown
+  linkType: soft
+
 "@niieani/beemo-driver-vite@npm:1.2.1":
   version: 1.2.1
   resolution: "@niieani/beemo-driver-vite@npm:1.2.1"
@@ -12115,18 +12127,6 @@ __metadata:
   checksum: ea6694ed150d435b18462d8615aa58d151714197d5fded378ba3fe80ec8786fefdef530e46c33a073b0e795988b4ce15293c9ae20c0af307879e97c74ad70632
   languageName: node
   linkType: hard
-
-"puppeteer-intercept-and-modify-requests@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "puppeteer-intercept-and-modify-requests@workspace:."
-  dependencies:
-    "@niieani/scaffold": "npm:^1.7.11"
-    escape-string-regexp: "npm:^4.0.0"
-    get-port: "npm:^5.0.0"
-    puppeteer: "npm:^21.5.0"
-    puppeteer-core: "npm:^21.5.0"
-  languageName: unknown
-  linkType: soft
 
 "puppeteer@npm:^21.5.0":
   version: 21.5.0

@@ -323,6 +323,38 @@ describe('RequestInterceptionManager', () => {
         expect(secondResponse).toBe('Second intercepted')
       })
 
+      it('should intercept requests with the same urlPattern but different resourceTypes', async () => {
+        serverHandlerRef.current = (req, res) => {
+          res.writeHead(200, { 'Content-Type': 'text/html' })
+          res.end('<img src="/hello.png"><p>Hello, world!</p>')
+        }
+        const blockRequest = jest.fn(() => ({
+          errorReason: 'BlockedByClient',
+        }))
+
+        manager = new RequestInterceptionManager(client)
+        await manager.intercept(
+          {
+            urlPattern: '*',
+            resourceType: 'Document',
+            modifyResponse: ({ body }) => ({
+              body: body?.replace('world', 'Jest'),
+            }),
+            ...options,
+          },
+          {
+            urlPattern: '*',
+            resourceType: 'Image',
+            modifyRequest: blockRequest as any,
+          },
+        )
+
+        await page.goto(`http://localhost:${port}`)
+        const text = await page.evaluate(() => document.body.textContent)
+        expect(text).toBe('Hello, Jest!')
+        expect(blockRequest).toHaveBeenCalledTimes(1)
+      })
+
       it('should intercept and modify requests on new tabs', async () => {
         serverHandlerRef.current = (req, res) => {
           if (req.url === '/') {

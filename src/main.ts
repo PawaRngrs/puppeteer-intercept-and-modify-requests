@@ -3,6 +3,7 @@ import { promisify } from 'util'
 import type { CDPSession, Protocol } from 'puppeteer-core'
 // eslint-disable-next-line import/no-unresolved
 import { getUrlPatternRegExp } from './urlPattern.js'
+import { InterceptionMap } from './InterceptionMap'
 
 export { getUrlPatternRegExp }
 
@@ -61,7 +62,7 @@ export type InterceptionWithUrlPatternRegExp = Interception & {
 const wait = promisify(setTimeout)
 
 export class RequestInterceptionManager {
-  interceptions: Map<string, InterceptionWithUrlPatternRegExp> = new Map()
+  interceptions: InterceptionMap = new InterceptionMap()
   #client: CDPSession
   #requestPausedHandler: (event: Protocol.Fetch.RequestPausedEvent) => void
   #isInstalled = false

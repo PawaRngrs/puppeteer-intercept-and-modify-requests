@@ -1,5 +1,5 @@
 {
-  "name": "puppeteer-intercept-and-modify-requests",
+  "name": "@mryellowsock/puppeteer-intercept-and-modify-requests",
   "keywords": [
     "puppeteer",
     "intercept",
@@ -15,14 +15,14 @@
     "utility"
   ],
   "bugs": {
-    "url": "https://github.com/niieani/puppeteer-intercept-and-modify-requests/issues"
+    "url": "https://github.com/MrYellowSock/puppeteer-intercept-and-modify-requests/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/niieani/puppeteer-intercept-and-modify-requests.git"
+    "url": "https://github.com/MrYellowSock/puppeteer-intercept-and-modify-requests.git"
   },
   "license": "Apache-2.0",
-  "author": "Bazyli Brzoska <npm@invent.life> (https://invent.life)",
+  "author": "MrYellowSock",
   "exports": {
     ".": {
       "import": "./esm/main.js",
