@@ -3,7 +3,6 @@
 .eslintrc.js
 .prettierignore
 .editorconfig
-tsconfig.json
 tsconfig.*.json
 babel.config.js
 jest.config.js
