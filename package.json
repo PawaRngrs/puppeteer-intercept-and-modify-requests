@@ -52,6 +52,7 @@
     "build:esm": "tsc --outDir esm --module esnext --target es2018 && echo '{\"name\": \"puppeteer-intercept-and-modify-requests\", \"type\": \"module\"}' > esm/package.json",
     "clean": "git clean -dfX --exclude=node_modules src",
     "format": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,json,md}\"",
+    "postinstall": "npm run build",
     "test": "npm run test:format && npm run test:types && npm run test:lint && npm run test:code",
     "test:code": "jest",
     "test:format": "prettier --check \"./src/**/*.{js,jsx,ts,tsx,json,md}\"",
@@ -91,13 +92,13 @@
     "prettier": "^3.0.0",
     "puppeteer": "^21.5.0",
     "puppeteer-core": "^21.5.0",
-    "ts-jest": "^29.1.0",
-    "typescript": "^5.0.0"
+    "ts-jest": "^29.1.0"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "escape-string-regexp": "^4.0.0"
+    "escape-string-regexp": "^4.0.0",
+    "typescript": "^5.0.0"
   }
 }
