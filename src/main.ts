@@ -1,29 +1,26 @@
-/* eslint-disable no-continue,no-await-in-loop,node/no-unpublished-import */
-import { promisify } from 'util'
-import type { CDPSession, Protocol } from 'puppeteer-core'
-// eslint-disable-next-line import/no-unresolved
-import { getUrlPatternRegExp } from './urlPattern.js'
-// eslint-disable-next-line import/no-unresolved
-import { InterceptionMap } from './InterceptionMap.js'
+import { promisify } from 'util';
+import type { CDPSession, Protocol } from 'puppeteer-core';
+import { getUrlPatternRegExp } from './urlPattern';
+import { InterceptionMap } from './InterceptionMap';
 
-export { getUrlPatternRegExp }
+export { getUrlPatternRegExp };
 
-const STATUS_CODE_OK = 200
+const STATUS_CODE_OK = 200;
 
 export type ModifiedResponse =
   | ((
       | {
-          responseCode?: number
-          responseHeaders?: Protocol.Fetch.HeaderEntry[]
-          body?: string
+          responseCode?: number;
+          responseHeaders?: Protocol.Fetch.HeaderEntry[];
+          body?: string;
         }
       | {
-          errorReason: Protocol.Network.ErrorReason
+          errorReason: Protocol.Network.ErrorReason;
         }
     ) & {
-      delay?: number
+      delay?: number;
     })
-  | void
+  | void;
 
 export type ModifiedRequest =
   | (ModifiedResponse &
@@ -31,98 +28,98 @@ export type ModifiedRequest =
         Protocol.Fetch.ContinueRequestRequest,
         'requestId' | 'interceptResponse'
       >)
-  | void
+  | void;
 
 export type ModifyResponseChunkFn = (
   responseChunk: Protocol.IO.ReadResponse & {
-    event: Protocol.Fetch.RequestPausedEvent
-  },
-) => Protocol.IO.ReadResponse | Promise<Protocol.IO.ReadResponse>
+    event: Protocol.Fetch.RequestPausedEvent;
+  }
+) => Protocol.IO.ReadResponse | Promise<Protocol.IO.ReadResponse>;
 
 export interface StreamResponseConfig {
-  chunkSize?: number
+  chunkSize?: number;
 }
 
 export type Interception = Omit<Protocol.Fetch.RequestPattern, 'requestStage'> &
   Pick<Required<Protocol.Fetch.RequestPattern>, 'urlPattern'> & {
     modifyResponse?: (response: {
-      body: string | undefined
-      event: Protocol.Fetch.RequestPausedEvent
-    }) => ModifiedResponse | Promise<ModifiedResponse>
-    modifyResponseChunk?: ModifyResponseChunkFn
-    streamResponse?: boolean | StreamResponseConfig
+      body: string | undefined;
+      event: Protocol.Fetch.RequestPausedEvent;
+    }) => ModifiedResponse | Promise<ModifiedResponse>;
+    modifyResponseChunk?: ModifyResponseChunkFn;
+    streamResponse?: boolean | StreamResponseConfig;
     modifyRequest?: (request: {
-      event: Protocol.Fetch.RequestPausedEvent
-    }) => ModifiedRequest | Promise<ModifiedRequest>
-  }
+      event: Protocol.Fetch.RequestPausedEvent;
+    }) => ModifiedRequest | Promise<ModifiedRequest>;
+  };
 
 export type InterceptionWithUrlPatternRegExp = Interception & {
-  urlPatternRegExp: RegExp
-}
+  urlPatternRegExp: RegExp;
+};
 
-const wait = promisify(setTimeout)
+const wait = promisify(setTimeout);
 
 export class RequestInterceptionManager {
-  interceptions: InterceptionMap = new InterceptionMap()
-  #client: CDPSession
-  #requestPausedHandler: (event: Protocol.Fetch.RequestPausedEvent) => void
-  #isInstalled = false
+  interceptions: InterceptionMap = new InterceptionMap();
+  #client: CDPSession;
+  #requestPausedHandler: (event: Protocol.Fetch.RequestPausedEvent) => void;
+  #isInstalled = false;
 
   // eslint-disable-next-line no-console
   constructor(client: CDPSession, { onError = console.error } = {}) {
-    this.#client = client
+    this.#client = client;
     this.#requestPausedHandler = (event: Protocol.Fetch.RequestPausedEvent) =>
-      void this.onRequestPausedEvent(event).catch(onError)
+      void this.onRequestPausedEvent(event).catch(onError);
   }
 
   async intercept(...interceptions: Interception[]) {
-    if (interceptions.length === 0) return
+    if (interceptions.length === 0) return;
     interceptions.forEach((interception) => {
       this.interceptions.set(interception.urlPattern, {
         ...interception,
         urlPatternRegExp: getUrlPatternRegExp(interception.urlPattern),
-      })
-    })
-    await this.enable()
+      });
+    });
+    await this.enable();
   }
 
   async removeIntercept(interceptUrlPattern: string) {
     if (this.interceptions.delete(interceptUrlPattern)) {
-      await (this.interceptions.size > 0 ? this.enable() : this.disable())
+      await (this.interceptions.size > 0 ? this.enable() : this.disable());
     }
   }
 
   async enable(): Promise<void> {
-    this.#install()
+    this.#install();
     return this.#client.send('Fetch.enable', {
       handleAuthRequests: false,
       patterns: [...this.interceptions.values()].map(
-        ({ modifyRequest, modifyResponse, ...config }) =>
+        ({ modifyRequest, modifyResponse: _modifyResponse, ...config }) =>
           ({
             ...config,
             requestStage: modifyRequest ? 'Request' : 'Response',
-          } as const),
+          }) as const
       ),
-    })
+    });
   }
 
   async disable(): Promise<void> {
-    this.#uninstall()
+    this.#uninstall();
     try {
-      await this.#client.send('Fetch.disable')
+      await this.#client.send('Fetch.disable');
     } catch {
       // ignore (most likely session closed)
     }
   }
 
   async clear() {
-    this.interceptions.clear()
-    await this.disable()
+    this.interceptions.clear();
+    await this.disable();
   }
 
   onRequestPausedEvent = async (event: Protocol.Fetch.RequestPausedEvent) => {
     const { requestId, responseStatusCode, request, responseErrorReason } =
-      event
+      event;
 
     for (const {
       modifyRequest,
@@ -133,18 +130,18 @@ export class RequestInterceptionManager {
       urlPattern,
       urlPatternRegExp,
     } of this.interceptions.values()) {
-      if (resourceType && resourceType !== event.resourceType) continue
-      if (urlPattern && !urlPatternRegExp.test(request.url)) continue
+      if (resourceType && resourceType !== event.resourceType) continue;
+      if (urlPattern && !urlPatternRegExp.test(request.url)) continue;
 
       const isResponse = Boolean(
-        event.responseHeaders ?? responseStatusCode ?? responseErrorReason,
-      )
+        event.responseHeaders ?? responseStatusCode ?? responseErrorReason
+      );
 
       if (!isResponse) {
         // handling a request
         const { delay, headers, method, postData, url, ...modification } =
-          (await modifyRequest?.({ event })) ?? {}
-        if (delay) await wait(delay)
+          (await modifyRequest?.({ event })) ?? {};
+        if (delay) await wait(delay);
 
         if (headers || method || postData || url) {
           await this.#client.send('Fetch.continueRequest', {
@@ -154,17 +151,17 @@ export class RequestInterceptionManager {
             url,
             requestId,
             interceptResponse: Boolean(modifyResponse),
-          })
+          });
         } else if ('errorReason' in modification) {
           await this.#client.send('Fetch.failRequest', {
             requestId,
             errorReason: modification.errorReason,
-          })
+          });
         } else if (responseErrorReason) {
           await this.#client.send('Fetch.failRequest', {
             requestId,
             errorReason: responseErrorReason,
-          })
+          });
         } else {
           await this.#client.send('Fetch.fulfillRequest', {
             ...modification,
@@ -173,7 +170,7 @@ export class RequestInterceptionManager {
               ? Buffer.from(modification.body).toString('base64')
               : undefined,
             responseCode: modification.responseCode ?? STATUS_CODE_OK,
-          })
+          });
         }
       } else if (modifyResponse || modifyResponseChunk) {
         const { base64Encoded, body: rawBody } =
@@ -181,27 +178,27 @@ export class RequestInterceptionManager {
             ? await this.#streamResponseBody(
                 event,
                 modifyResponseChunk,
-                typeof streamResponse === 'boolean' ? {} : streamResponse,
+                typeof streamResponse === 'boolean' ? {} : streamResponse
               )
-            : await this.#getResponseBody(event)
+            : await this.#getResponseBody(event);
 
         const body =
           base64Encoded && rawBody
             ? Buffer.from(rawBody, 'base64').toString('utf8')
-            : rawBody
+            : rawBody;
         const { delay, ...modification } = (await modifyResponse?.({
           body,
           event,
-        })) ?? { body }
+        })) ?? { body };
 
-        if (delay) await wait(delay)
+        if (delay) await wait(delay);
 
         if ('errorReason' in modification) {
           await this.#client.send('Fetch.failRequest', {
             requestId,
             errorReason: modification.errorReason,
-          })
-          return
+          });
+          return;
         }
 
         await this.#client.send('Fetch.fulfillRequest', {
@@ -212,52 +209,52 @@ export class RequestInterceptionManager {
           body: modification.body
             ? Buffer.from(modification.body).toString('base64')
             : undefined,
-        })
+        });
       }
     }
-  }
+  };
 
   #install() {
-    if (this.#isInstalled) return
+    if (this.#isInstalled) return;
 
-    this.#client.on('Fetch.requestPaused', this.#requestPausedHandler)
-    this.#isInstalled = true
+    this.#client.on('Fetch.requestPaused', this.#requestPausedHandler);
+    this.#isInstalled = true;
   }
 
   #uninstall() {
-    if (!this.#isInstalled) return
+    if (!this.#isInstalled) return;
 
-    this.#client.off('Fetch.requestPaused', this.#requestPausedHandler)
-    this.#isInstalled = false
+    this.#client.off('Fetch.requestPaused', this.#requestPausedHandler);
+    this.#isInstalled = false;
   }
 
   async #getResponseBody(
-    event: Protocol.Fetch.RequestPausedEvent,
+    event: Protocol.Fetch.RequestPausedEvent
   ): Promise<{ body: string | undefined; base64Encoded?: boolean }> {
     return (
       this.#client
         .send('Fetch.getResponseBody', { requestId: event.requestId })
         // handle the case of redirects (e.g. 301) and other situations without a body:
         .catch(() => ({ base64Encoded: false, body: undefined }))
-    )
+    );
   }
 
   async #streamResponseBody(
     event: Protocol.Fetch.RequestPausedEvent,
     modifyResponseChunk?: ModifyResponseChunkFn,
-    { chunkSize }: StreamResponseConfig = {},
+    { chunkSize }: StreamResponseConfig = {}
   ): Promise<{ body: string | undefined; base64Encoded?: boolean }> {
     const { stream } = await this.#client
       .send('Fetch.takeResponseBodyAsStream', { requestId: event.requestId })
       // handle the case of redirects (e.g. 301) and other situations without a body:
-      .catch(() => ({ stream: null }))
+      .catch(() => ({ stream: null }));
 
     if (!stream) {
-      return { body: undefined }
+      return { body: undefined };
     }
 
-    let body = ''
-    let base64Encoded = false
+    let body = '';
+    let base64Encoded = false;
 
     try {
       // TODO: run loop at most once per XXms
@@ -265,24 +262,24 @@ export class RequestInterceptionManager {
         const result = await this.#client.send('IO.read', {
           handle: stream,
           size: chunkSize,
-        })
+        });
         const {
           data,
           eof,
           base64Encoded: isBase64,
-        } = (await modifyResponseChunk?.({ ...result, event })) ?? result
+        } = (await modifyResponseChunk?.({ ...result, event })) ?? result;
 
         if (isBase64) {
-          base64Encoded = true
+          base64Encoded = true;
         }
-        body += data
-        if (eof) break
+        body += data;
+        if (eof) break;
       }
     } finally {
       if (stream) {
-        await this.#client.send('IO.close', { handle: stream })
+        await this.#client.send('IO.close', { handle: stream });
       }
     }
-    return { base64Encoded, body }
+    return { base64Encoded, body };
   }
 }

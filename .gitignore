@@ -34,6 +34,7 @@ logs/
 .npm
 .vscode
 .yarnclean
+.history
 
 # Directories
 coverage/

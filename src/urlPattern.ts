@@ -1,4 +1,4 @@
-import escapeRegExp from 'escape-string-regexp'
+import escapeRegExp from 'escape-string-regexp';
 
 export const getUrlPatternRegExp = (urlPattern: string) =>
   new RegExp(
@@ -6,5 +6,5 @@ export const getUrlPatternRegExp = (urlPattern: string) =>
       .replace(/(?<!\\)\\\*/g, '.*')
       .replace(/\\{3}\*/g, '\\*')
       .replace(/(?<!\\)\\\?/g, '.{1}')
-      .replace(/\\{3}\?/g, '\\?'),
-  )
+      .replace(/\\{3}\?/g, '\\?')
+  );

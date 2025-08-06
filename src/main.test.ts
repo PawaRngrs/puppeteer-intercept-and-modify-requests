@@ -1,66 +1,65 @@
-/* eslint-disable jest/no-conditional-in-test */
-import * as http from 'http'
-import getPort from 'get-port'
-import type { Server } from 'http'
-import * as _puppeteer from 'puppeteer'
-import type * as puppeteerType from 'puppeteer-core'
-import { RequestInterceptionManager } from './main'
+import * as http from 'http';
+import getPort from 'get-port';
+import type { Server } from 'http';
+import * as _puppeteer from 'puppeteer';
+import type * as puppeteerType from 'puppeteer-core';
+import { RequestInterceptionManager } from './main';
 
-const puppeteer = _puppeteer as unknown as typeof puppeteerType
+const puppeteer = _puppeteer as unknown as typeof puppeteerType;
 
-let server: Server
-let port = 3_000
-let browser: puppeteerType.Browser
-let page: puppeteerType.Page
-let client: puppeteerType.CDPSession
-let browserClient: puppeteerType.CDPSession
-let manager: RequestInterceptionManager
+let server: Server;
+let port = 3_000;
+let browser: puppeteerType.Browser;
+let page: puppeteerType.Page;
+let client: puppeteerType.CDPSession;
+let browserClient: puppeteerType.CDPSession;
+let manager: RequestInterceptionManager;
 
-const host = 'localhost'
-const serverHandlerRef: { current?: http.RequestListener } = {}
+const host = 'localhost';
+const serverHandlerRef: { current?: http.RequestListener } = {};
 
 const startServer = async (): Promise<{ server: Server; port: number }> => {
-  const usedPort = await getPort({ host, port })
+  const usedPort = await getPort({ host, port });
   return new Promise((resolve) => {
     const s = http.createServer((req, res) => {
-      serverHandlerRef.current?.(req, res)
-    })
-    s.listen(usedPort, host, () => void resolve({ server: s, port: usedPort }))
-  })
-}
+      serverHandlerRef.current?.(req, res);
+    });
+    s.listen(usedPort, host, () => void resolve({ server: s, port: usedPort }));
+  });
+};
 
 const stopServer = (): Promise<void> =>
   new Promise((resolve, reject) => {
     server.close((err) => {
-      if (err) reject(err)
-      else resolve()
-    })
-    server.closeAllConnections()
-  })
+      if (err) reject(err);
+      else resolve();
+    });
+    server.closeAllConnections();
+  });
 
 describe('RequestInterceptionManager', () => {
-  jest.setTimeout(5_000)
+  jest.setTimeout(5_000);
 
   beforeAll(async () => {
-    browser = await puppeteer.launch({ headless: 'new' })
-    browserClient = await browser.target().createCDPSession()
-    ;({ port, server } = await startServer())
-  })
+    browser = await puppeteer.launch({ headless: 'new' });
+    browserClient = await browser.target().createCDPSession();
+    ({ port, server } = await startServer());
+  });
 
   afterAll(async () => {
-    await stopServer()
-    await browser.close()
-  })
+    await stopServer();
+    await browser.close();
+  });
 
   beforeEach(async () => {
-    page = await browser.newPage()
-    client = await page.target().createCDPSession()
-  })
+    page = await browser.newPage();
+    client = await page.target().createCDPSession();
+  });
 
   afterEach(async () => {
-    await page.close()
-    await manager.clear()
-  })
+    await page.close();
+    await manager.clear();
+  });
 
   describe.each`
     streamResponse
@@ -71,100 +70,100 @@ describe('RequestInterceptionManager', () => {
     (options: { streamResponse: boolean }) => {
       it('should intercept and modify response', async () => {
         serverHandlerRef.current = (req, res) => {
-          res.writeHead(200, { 'Content-Type': 'text/plain' })
-          res.end('Hello, world!')
-        }
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end('Hello, world!');
+        };
 
-        manager = new RequestInterceptionManager(client)
+        manager = new RequestInterceptionManager(client);
         await manager.intercept({
           urlPattern: '*',
           modifyResponse: ({ body }) => ({
             body: body?.replace('world', 'Jest'),
           }),
           ...options,
-        })
+        });
 
-        await page.goto(`http://localhost:${port}`)
-        const text = await page.evaluate(() => document.body.textContent)
-        expect(text).toBe('Hello, Jest!')
+        await page.goto(`http://localhost:${port}`);
+        const text = await page.evaluate(() => document.body.textContent);
+        expect(text).toBe('Hello, Jest!');
 
         const response = await page.evaluate(async (url) => {
-          const response = await fetch(url)
-          return response.text()
-        }, `http://localhost:${port}`)
+          const response = await fetch(url);
+          return response.text();
+        }, `http://localhost:${port}`);
 
-        expect(response).toBe('Hello, Jest!')
-      })
+        expect(response).toBe('Hello, Jest!');
+      });
 
       it('should intercept and modify request', async () => {
         serverHandlerRef.current = (req, res) => {
           if (req.url === '/') {
-            res.writeHead(200, { 'Content-Type': 'text/plain' })
-            res.end('Original request')
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('Original request');
           } else if (req.url === '/modified') {
-            res.writeHead(200, { 'Content-Type': 'text/plain' })
-            res.end('Modified request')
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('Modified request');
           } else {
-            res.writeHead(404, { 'Content-Type': 'text/plain' })
-            res.end('Not found')
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not found');
           }
-        }
+        };
 
-        manager = new RequestInterceptionManager(client)
+        manager = new RequestInterceptionManager(client);
         await manager.intercept({
           urlPattern: '*/original',
           modifyRequest: ({ event }) => ({
             url: event.request.url.replace('original', 'modified'),
           }),
           ...options,
-        })
+        });
 
-        await page.goto(`http://localhost:${port}`)
-        const text = await page.evaluate(() => document.body.textContent)
-        expect(text).toBe('Original request')
+        await page.goto(`http://localhost:${port}`);
+        const text = await page.evaluate(() => document.body.textContent);
+        expect(text).toBe('Original request');
 
         const response = await page.evaluate(async (url) => {
-          const response = await fetch(url)
-          return response.text()
-        }, `http://localhost:${port}/original`)
+          const response = await fetch(url);
+          return response.text();
+        }, `http://localhost:${port}/original`);
 
-        expect(response).toBe('Modified request')
-      })
+        expect(response).toBe('Modified request');
+      });
 
       it('should not intercept requests not matching urlPattern', async () => {
         serverHandlerRef.current = (req, res) => {
-          res.writeHead(200, { 'Content-Type': 'text/plain' })
-          res.end('Hello, world!')
-        }
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end('Hello, world!');
+        };
 
-        manager = new RequestInterceptionManager(client)
+        manager = new RequestInterceptionManager(client);
         await manager.intercept({
           urlPattern: 'non-existent-url/*',
           modifyResponse: ({ body }) => ({
             body: body?.replace('world', 'Jest'),
           }),
           ...options,
-        })
+        });
 
-        await page.goto(`http://localhost:${port}`)
-        const text = await page.evaluate(() => document.body.textContent)
-        expect(text).toBe('Hello, world!')
+        await page.goto(`http://localhost:${port}`);
+        const text = await page.evaluate(() => document.body.textContent);
+        expect(text).toBe('Hello, world!');
 
         const response = await page.evaluate(async (url) => {
-          const response = await fetch(url)
-          return response.text()
-        }, `http://localhost:${port}`)
+          const response = await fetch(url);
+          return response.text();
+        }, `http://localhost:${port}`);
 
-        expect(response).toBe('Hello, world!')
-      })
+        expect(response).toBe('Hello, world!');
+      });
 
       it('should handle intercepting a 304 response', async () => {
         serverHandlerRef.current = (req, res) => {
-          res.writeHead(304, { 'Content-Type': 'text/plain' })
-          res.end()
-        }
+          res.writeHead(304, { 'Content-Type': 'text/plain' });
+          res.end();
+        };
 
-        manager = new RequestInterceptionManager(client)
+        manager = new RequestInterceptionManager(client);
         await manager.intercept({
           urlPattern: '*',
           modifyResponse: () => ({
@@ -172,34 +171,34 @@ describe('RequestInterceptionManager', () => {
             body: 'Intercepted',
           }),
           ...options,
-        })
+        });
 
-        await page.goto(`http://localhost:${port}`)
-        const text = await page.evaluate(() => document.body.textContent)
-        expect(text).toBe('Intercepted')
+        await page.goto(`http://localhost:${port}`);
+        const text = await page.evaluate(() => document.body.textContent);
+        expect(text).toBe('Intercepted');
 
         const response = await page.evaluate(async (url) => {
-          const response = await fetch(url)
-          return response.text()
-        }, `http://localhost:${port}`)
+          const response = await fetch(url);
+          return response.text();
+        }, `http://localhost:${port}`);
 
-        expect(response).toBe('Intercepted')
-      })
+        expect(response).toBe('Intercepted');
+      });
 
       it('should handle intercepting a redirect response', async () => {
         serverHandlerRef.current = (req, res) => {
           if (req.url === '/redirected') {
-            res.writeHead(200, { 'Content-Type': 'text/plain' })
-            res.end('Works')
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('Works');
           } else {
             res.writeHead(301, {
               Location: `http://localhost:${port}/redirected`,
-            })
-            res.end()
+            });
+            res.end();
           }
-        }
+        };
 
-        manager = new RequestInterceptionManager(client)
+        manager = new RequestInterceptionManager(client);
         await manager.intercept({
           urlPattern: '*/redirected',
           modifyResponse: ({ body, event: { responseStatusCode } }) => ({
@@ -207,18 +206,18 @@ describe('RequestInterceptionManager', () => {
             body: `Modified: ${body} ${responseStatusCode}`,
           }),
           ...options,
-        })
+        });
 
-        await page.goto(`http://localhost:${port}/somePath`)
-        const text = await page.evaluate(() => document.body.textContent)
-        expect(text).toBe('Modified: Works 200')
+        await page.goto(`http://localhost:${port}/somePath`);
+        const text = await page.evaluate(() => document.body.textContent);
+        expect(text).toBe('Modified: Works 200');
 
         const response = await page.evaluate(async (url) => {
-          const response = await fetch(url, { redirect: 'follow' })
-          return response.text()
-        }, `http://localhost:${port}/somePath`)
+          const response = await fetch(url, { redirect: 'follow' });
+          return response.text();
+        }, `http://localhost:${port}/somePath`);
 
-        expect(response).toBe('Modified: Works 200')
+        expect(response).toBe('Modified: Works 200');
 
         await manager.intercept({
           urlPattern: '*/somePath',
@@ -227,27 +226,27 @@ describe('RequestInterceptionManager', () => {
             body: `Modified: ${responseStatusCode}, body: ${body ?? 'n/a'}`,
           }),
           ...options,
-        })
+        });
 
-        await page.goto(`http://localhost:${port}/somePath`)
-        const text2 = await page.evaluate(() => document.body.textContent)
-        expect(text2).toBe('Modified: 301, body: n/a')
+        await page.goto(`http://localhost:${port}/somePath`);
+        const text2 = await page.evaluate(() => document.body.textContent);
+        expect(text2).toBe('Modified: 301, body: n/a');
 
         const response2 = await page.evaluate(async (url) => {
-          const response2 = await fetch(url, { redirect: 'follow' })
-          return response2.text()
-        }, `http://localhost:${port}/somePath`)
+          const response2 = await fetch(url, { redirect: 'follow' });
+          return response2.text();
+        }, `http://localhost:${port}/somePath`);
 
-        expect(response2).toBe('Modified: 301, body: n/a')
-      })
+        expect(response2).toBe('Modified: 301, body: n/a');
+      });
 
       it('should handle different status codes', async () => {
         serverHandlerRef.current = (req, res) => {
-          res.writeHead(403, { 'Content-Type': 'text/plain' })
-          res.end('It is forbidden')
-        }
+          res.writeHead(403, { 'Content-Type': 'text/plain' });
+          res.end('It is forbidden');
+        };
 
-        manager = new RequestInterceptionManager(client)
+        manager = new RequestInterceptionManager(client);
         await manager.intercept({
           urlPattern: '*',
           modifyResponse: ({ body }) => ({
@@ -255,39 +254,39 @@ describe('RequestInterceptionManager', () => {
             body: body?.replace('It is forbidden', 'Modified Unauthorized'),
           }),
           ...options,
-        })
+        });
 
-        await page.goto(`http://localhost:${port}`)
-        const text = await page.evaluate(() => document.body.textContent)
-        expect(text).toBe('Modified Unauthorized')
+        await page.goto(`http://localhost:${port}`);
+        const text = await page.evaluate(() => document.body.textContent);
+        expect(text).toBe('Modified Unauthorized');
 
         const response = await page.evaluate(async (url) => {
-          const response = await fetch(url)
+          const response = await fetch(url);
           return {
             status: response.status,
             text: await response.text(),
-          }
-        }, `http://localhost:${port}`)
+          };
+        }, `http://localhost:${port}`);
 
-        expect(response.status).toBe(401)
-        expect(response.text).toBe('Modified Unauthorized')
-      })
+        expect(response.status).toBe(401);
+        expect(response.text).toBe('Modified Unauthorized');
+      });
 
       it('should handle multiple interception rules', async () => {
         serverHandlerRef.current = (req, res) => {
           if (req.url === '/first') {
-            res.writeHead(200, { 'Content-Type': 'text/plain' })
-            res.end('First')
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('First');
           } else if (req.url === '/second') {
-            res.writeHead(200, { 'Content-Type': 'text/plain' })
-            res.end('Second')
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('Second');
           } else {
-            res.writeHead(404, { 'Content-Type': 'text/plain' })
-            res.end('Not found')
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not found');
           }
-        }
+        };
 
-        manager = new RequestInterceptionManager(client)
+        manager = new RequestInterceptionManager(client);
         await manager.intercept(
           {
             urlPattern: '*/first',
@@ -302,37 +301,37 @@ describe('RequestInterceptionManager', () => {
               body: body?.replace('Second', 'Second intercepted'),
             }),
             ...options,
-          },
-        )
+          }
+        );
 
-        await page.goto(`http://localhost:${port}`)
-        const text = await page.evaluate(() => document.body.textContent)
-        expect(text).toBe('Not found')
+        await page.goto(`http://localhost:${port}`);
+        const text = await page.evaluate(() => document.body.textContent);
+        expect(text).toBe('Not found');
 
         const firstResponse = await page.evaluate(async (url) => {
-          const response = await fetch(url)
-          return response.text()
-        }, `http://localhost:${port}/first`)
+          const response = await fetch(url);
+          return response.text();
+        }, `http://localhost:${port}/first`);
 
         const secondResponse = await page.evaluate(async (url) => {
-          const response = await fetch(url)
-          return response.text()
-        }, `http://localhost:${port}/second`)
+          const response = await fetch(url);
+          return response.text();
+        }, `http://localhost:${port}/second`);
 
-        expect(firstResponse).toBe('First intercepted')
-        expect(secondResponse).toBe('Second intercepted')
-      })
+        expect(firstResponse).toBe('First intercepted');
+        expect(secondResponse).toBe('Second intercepted');
+      });
 
       it('should intercept requests with the same urlPattern but different resourceTypes', async () => {
         serverHandlerRef.current = (req, res) => {
-          res.writeHead(200, { 'Content-Type': 'text/html' })
-          res.end('<img src="/hello.png"><p>Hello, world!</p>')
-        }
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end('<img src="/hello.png"><p>Hello, world!</p>');
+        };
         const blockRequest = jest.fn(() => ({
           errorReason: 'BlockedByClient',
-        }))
+        }));
 
-        manager = new RequestInterceptionManager(client)
+        manager = new RequestInterceptionManager(client);
         await manager.intercept(
           {
             urlPattern: '*',
@@ -346,31 +345,31 @@ describe('RequestInterceptionManager', () => {
             urlPattern: '*',
             resourceType: 'Image',
             modifyRequest: blockRequest as any,
-          },
-        )
+          }
+        );
 
-        await page.goto(`http://localhost:${port}`)
-        const text = await page.evaluate(() => document.body.textContent)
-        expect(text).toBe('Hello, Jest!')
-        expect(blockRequest).toHaveBeenCalledTimes(1)
-      })
+        await page.goto(`http://localhost:${port}`);
+        const text = await page.evaluate(() => document.body.textContent);
+        expect(text).toBe('Hello, Jest!');
+        expect(blockRequest).toHaveBeenCalledTimes(1);
+      });
 
       it('should intercept and modify requests on new tabs', async () => {
         serverHandlerRef.current = (req, res) => {
           if (req.url === '/') {
-            res.writeHead(200, { 'Content-Type': 'text/html' })
-            res.end('<a href="/new-tab" target="_blank">Open new tab</a>')
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end('<a href="/new-tab" target="_blank">Open new tab</a>');
           } else if (req.url === '/new-tab') {
-            res.writeHead(200, { 'Content-Type': 'text/plain' })
-            res.end('Hello, new tab!')
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('Hello, new tab!');
           } else {
-            res.writeHead(404, { 'Content-Type': 'text/plain' })
-            res.end('Not found')
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not found');
           }
-        }
+        };
 
         // Set up request interception for the initial page
-        manager = new RequestInterceptionManager(browserClient)
+        manager = new RequestInterceptionManager(browserClient);
         await manager.intercept({
           urlPattern: '*',
           modifyResponse: ({ body }) =>
@@ -380,76 +379,76 @@ describe('RequestInterceptionManager', () => {
                 }
               : undefined,
           ...options,
-        })
+        });
 
-        await page.goto(`http://localhost:${port}`)
+        await page.goto(`http://localhost:${port}`);
 
         // Listen for a new page to be opened
         const newPagePromise = browser
           .waitForTarget(
             (target) =>
               target.type() === 'page' &&
-              target.url() === `http://localhost:${port}/new-tab`,
+              target.url() === `http://localhost:${port}/new-tab`
           )
           .then((target) => target.page())
-          .then((newPage) => newPage!)
+          .then((newPage) => newPage!);
 
         // Click the link to open a new tab
-        await page.click('a')
+        await page.click('a');
 
         // Wait for the new page to be opened
-        const newPage = await newPagePromise
+        const newPage = await newPagePromise;
 
         // Check if the request on the new tab was intercepted and modified
-        const newText = await newPage.evaluate(() => document.body.textContent)
-        expect(newText).toBe('Hello, new tab intercepted!')
+        const newText = await newPage.evaluate(() => document.body.textContent);
+        expect(newText).toBe('Hello, new tab intercepted!');
 
         const newResponse = await newPage.evaluate(async (url) => {
-          const response = await fetch(url)
-          return response.text()
-        }, `http://localhost:${port}/new-tab`)
+          const response = await fetch(url);
+          return response.text();
+        }, `http://localhost:${port}/new-tab`);
 
-        await newPage.close()
+        await newPage.close();
 
-        expect(newResponse).toBe('Hello, new tab intercepted!')
-      })
-    },
-  )
+        expect(newResponse).toBe('Hello, new tab intercepted!');
+      });
+    }
+  );
 
   it('should intercept and modify response chunks from an EventStream', async () => {
-    const messages = ['Hello', 'world', '!']
-    let messageId = 0
+    const messages = ['Hello', 'world', '!'];
+    let messageId = 0;
 
     // Set up an EventStream server that sends a series of messages
     serverHandlerRef.current = (req, res) => {
       if (req.url === '/') {
-        res.writeHead(200, { 'Content-Type': 'text/plain' })
-        res.end('Hello!')
-        return
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('Hello!');
+        return;
       }
 
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
-      })
+      });
 
       const sendNextMessage = () => {
-        res.write(`id: ${messageId}\n`)
-        res.write(`data: ${messages[messageId]}\n\n`)
-        messageId += 1
+        res.write(`id: ${messageId}\n`);
+        res.write(`data: ${messages[messageId]}\n\n`);
+        messageId += 1;
 
         if (messageId >= messages.length) {
-          res.end()
+          res.end();
         }
-      }
+      };
 
-      sendNextMessage()
-      sendNextMessage()
-      sendNextMessage()
-    }
+      sendNextMessage();
+      sendNextMessage();
+      sendNextMessage();
+    };
 
-    manager = new RequestInterceptionManager(client)
+    manager = new RequestInterceptionManager(client);
     await manager.intercept({
       urlPattern: '*/stream',
       // Replace "world" with "Jest" in the response chunk
@@ -458,31 +457,31 @@ describe('RequestInterceptionManager', () => {
         ...rest,
       }),
       streamResponse: { chunkSize: 10 },
-    })
+    });
 
-    await page.goto(`http://localhost:${port}`)
+    await page.goto(`http://localhost:${port}`);
 
     const receivedMessages = await page.evaluate(async (url) => {
-      const eventSource = new EventSource(url)
-      const receivedMessages: string[] = []
+      const eventSource = new EventSource(url);
+      const receivedMessages: string[] = [];
 
       return new Promise<string[]>((resolve, reject) => {
         eventSource.addEventListener('message', (event) => {
-          receivedMessages.push(event.data)
+          receivedMessages.push(event.data);
 
           if (receivedMessages.length === 3) {
-            eventSource.close()
-            resolve(receivedMessages)
+            eventSource.close();
+            resolve(receivedMessages);
           }
-        })
+        });
 
         eventSource.addEventListener('error', (error) => {
-          eventSource.close()
-          reject(error)
-        })
-      })
-    }, `http://localhost:${port}/stream`)
+          eventSource.close();
+          reject(error);
+        });
+      });
+    }, `http://localhost:${port}/stream`);
 
-    expect(receivedMessages).toEqual(['Hello', 'Jest', '!'])
-  })
-})
+    expect(receivedMessages).toEqual(['Hello', 'Jest', '!']);
+  });
+});
